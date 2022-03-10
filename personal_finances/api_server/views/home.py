@@ -5,6 +5,7 @@ from rest_framework import status
 @api_view(['GET'])
 def home(request):
     return Response(
-        {'message': f'Personal finances API. Welcome {request.user.first_name}'},
+        {'message': 'Personal finances API.'\
+            f' Welcome {request.user.get_full_name()}'},
         status=status.HTTP_200_OK
     )
