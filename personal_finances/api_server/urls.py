@@ -9,7 +9,7 @@ router.register('user', user.UserManagement)
 apiurlpatterns = [
     path('', home.home),
     path('login/', authviews.obtain_auth_token),
-    path('delete-token/', user.delete_token),
+    path('delete-token/', user.DeleteToken.as_view()),
 ]
 
 apiurlpatterns.extend(router.urls)
