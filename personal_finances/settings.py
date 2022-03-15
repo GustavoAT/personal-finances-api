@@ -29,8 +29,6 @@ DEBUG = bool(ENV['DEBUG']=='True')
 
 ALLOWED_HOSTS = ['*']
 
-CORS_ORIGIN_ALLOW_ALL = bool(ENV['CORS_ORIGIN_ALLOW_ALL']=='True')
-
 # Application definition
 
 INSTALLED_APPS = [

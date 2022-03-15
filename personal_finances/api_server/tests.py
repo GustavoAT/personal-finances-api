@@ -3,6 +3,8 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
+from personal_finances.api_server.models import Account
+
 class TestUser(APITestCase):
     def setUp(self) -> None:
         self.client = APIClient()
@@ -36,6 +38,10 @@ class TestUser(APITestCase):
         response = self.client.get('/v1/user/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsInstance(response.json(), list)
+        token = Token.objects.get_or_create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
+        response = self.client.get('/v1/user/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         
     def test_user_retrieve(self):
         token = Token.objects.get_or_create(user=self.admin)
@@ -65,15 +71,48 @@ class TestUser(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
         response = self.client.delete(f'/v1/user/{self.user.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-    
-class TestHome(APITestCase):
+
+class BaseTestCase(APITestCase):
     def setUp(self) -> None:
         self.client = APIClient()
         self.user = User.objects.create_user(
             username='TestUser2', password='testpassword2')
         self.token = Token.objects.get_or_create(user=self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token[0]}')
-    
+
+class TestHome(BaseTestCase):
     def test_home_logged(self):
         response = self.client.get('/v1/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+class TestAccount(BaseTestCase):
+    def test_crud(self):
+        response = self.client.post(
+            '/v1/account/',
+            {
+                'name': 'bank1',
+                'description': 'first account',
+                'initial_value': 0
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        account_id = response.json()['id']
+        # list
+        response = self.client.get('/v1/account/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # retrieve
+        response = self.client.get(f'/v1/account/{account_id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['name'], 'bank1')
+        # update
+        response = self.client.patch(
+            f'/v1/account/{account_id}/',
+            {
+                'name': 'bank 2'
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['name'], 'bank 2')
+        # delete
+        response = self.client.delete(f'/v1/account/{account_id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

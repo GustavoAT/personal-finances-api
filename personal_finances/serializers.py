@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
+from personal_finances.api_server.models import Account
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -19,3 +21,9 @@ class UserUpdateAsAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         exclude = ['password']
+
+class AccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        exclude = ['user']
+        read_only_fields = ['value']
