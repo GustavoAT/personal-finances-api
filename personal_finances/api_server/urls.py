@@ -14,6 +14,8 @@ apiurlpatterns = [
     path('account/<int:id>/', views.AccountView.as_view()),
     path('category/', views.CategoryView.as_view()),
     path('category/<int:id>/', views.CategoryView.as_view()),
+    path('subcategory/', views.SubcategoryView.as_view()),
+    path('subcategory/<int:id>/', views.SubcategoryView.as_view()),
 ]
 
 apiurlpatterns.extend(router.urls)

@@ -4,9 +4,9 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth.models import User
-from personal_finances.api_server.models import Account, Category
+from personal_finances.api_server.models import Account, Category, Subcategory
 
-from personal_finances.serializers import (AccountSerializer, CategorySerializer, CategoryUpdateSerializer, UserSerializer,
+from personal_finances.serializers import (AccountSerializer, CategorySerializer, CategoryUpdateSerializer, SubcategorySerializer, SubcategoryUpdateSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
 
 class Home(APIView):
@@ -135,4 +135,59 @@ class CategoryView(APIView):
         except Category.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         category.delete()
+        return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+class SubcategoryView(APIView):
+    def get(self, request, id=None):
+        if id:
+            try:
+                subcategory = Subcategory.objects.get(
+                    id=id,
+                    category__user=request.user
+                )
+            except Subcategory.DoesNotExist:
+                return Response({}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                SubcategorySerializer(
+                    subcategory).data, status=status.HTTP_200_OK)
+        subcategories = Subcategory.objects.filter(category__user=request.user)
+        category_id = request.query_params.get('category')
+        if category_id:
+            subcategories = subcategories.filter(category=category_id)
+        subcategory_srz = SubcategorySerializer(subcategories, many=True)
+        if subcategory_srz.data:
+            return Response(subcategory_srz.data, status=status.HTTP_200_OK)
+        return Response(subcategory_srz.data, status=status.HTTP_404_NOT_FOUND)
+    
+    def post(self, request):
+        subcategory_srz = SubcategorySerializer(data=request.data)
+        if not subcategory_srz.is_valid():
+            return Response(
+                subcategory_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        subcategory = subcategory_srz.save()
+        subcategory_srz = SubcategorySerializer(subcategory)
+        return Response(subcategory_srz.data, status=status.HTTP_200_OK)
+    
+    def patch(self, request, id):
+        try:
+            subcategory = Subcategory.objects.get(
+                id=id, category__user=request.user)
+        except Subcategory.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        subcategory_srz = SubcategoryUpdateSerializer(
+            subcategory, data=request.data)
+        if not subcategory_srz.is_valid():
+            return Response(
+                subcategory_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        new_subcategory = subcategory_srz.save()
+        subcategory_srz = SubcategorySerializer(new_subcategory)
+        return Response(subcategory_srz.data, status=status.HTTP_200_OK)
+    
+    def delete(self, request, id):
+        try:
+            subcategory = Subcategory.objects.get(
+                id=id, category__user=request.user)
+        except Subcategory.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        subcategory.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)

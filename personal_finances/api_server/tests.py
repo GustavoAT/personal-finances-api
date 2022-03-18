@@ -160,4 +160,43 @@ class TestCategory(BaseTestCase):
         response = self.client.delete(f'/v1/category/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         
+class TestSubcategory(BaseTestCase):
+    def test_crud(self):
+        # create
+        category = Category(name='Home', of_type=Category.EXPENSE)
+        category.user=self.user
+        category.save()
+        response = self.client.post(
+            '/v1/subcategory/',
+            {
+                'name': 'Maintenance',
+                'category': category.id
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        # retrieve
+        response = self.client.get(f'/v1/subcategory/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # list
+        response = self.client.get(
+            '/v1/subcategory/',
+            {'category': category.id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()[0]['id']
+        # update
+        category2 = Category(name='Clothes', of_type=Category.EXPENSE)
+        category2.user=self.user
+        category2.save()
+        response = self.client.patch(
+            f'/v1/subcategory/{id}/',
+            {'name': 'Furniture', 'category': category2.id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(response.json()['category'], category2.id)
+        self.assertEqual(response.json()['name'], 'Furniture')
+        # delete
+        response = self.client.delete(f'/v1/subcategory/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         

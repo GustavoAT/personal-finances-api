@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from personal_finances.api_server.models import (Account, Category, Transaction)
+from personal_finances.api_server.models import (Account, Category, Subcategory, Transaction)
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -38,6 +38,17 @@ class CategoryUpdateSerializer(serializers.ModelSerializer):
         model = Category
         exclude = ['user', 'of_type']
 
+class SubcategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subcategory
+        fields = '__all__'
+
+class SubcategoryUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subcategory
+        exclude = ['category']
+
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
+        fields = '__all__'
