@@ -12,6 +12,8 @@ apiurlpatterns = [
     path('delete-token/', views.DeleteToken.as_view()),
     path('account/', views.AccountView.as_view()),
     path('account/<int:id>/', views.AccountView.as_view()),
+    path('category/', views.CategoryView.as_view()),
+    path('category/<int:id>/', views.CategoryView.as_view()),
 ]
 
 apiurlpatterns.extend(router.urls)

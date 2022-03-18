@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
-from personal_finances.api_server.models import Account
+from personal_finances.api_server.models import Account, Category
 
 class TestUser(APITestCase):
     def setUp(self) -> None:
@@ -87,6 +87,7 @@ class TestHome(BaseTestCase):
 
 class TestAccount(BaseTestCase):
     def test_crud(self):
+        # create
         response = self.client.post(
             '/v1/account/',
             {
@@ -116,3 +117,47 @@ class TestAccount(BaseTestCase):
         # delete
         response = self.client.delete(f'/v1/account/{account_id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+class TestCategory(BaseTestCase):
+    def test_crud(self):
+        # create
+        categories = [
+            {
+                'name': 'Salary',
+                'of_type': Category.INCOME
+            },
+            {
+                'name': 'Home',
+                'of_type': Category.EXPENSE
+            }
+        ]
+        for category in categories:
+            response = self.client.post(
+                '/v1/category/',
+                category
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            id = response.json()['id']
+            # retrieve
+            response = self.client.get(f'/v1/category/{id}/')
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # list
+        response = self.client.get('/v1/category/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.get(
+            '/v1/category/', {'of_type': Category.INCOME})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()[0]['id']
+        # update
+        response = self.client.patch(
+            f'/v1/category/{id}/',
+            {'name': 'Health', 'of_type': Category.EXPENSE}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(response.json()['of_type'], Category.EXPENSE)
+        self.assertEqual(response.json()['name'], 'Health')
+        # delete
+        response = self.client.delete(f'/v1/category/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        
+        
