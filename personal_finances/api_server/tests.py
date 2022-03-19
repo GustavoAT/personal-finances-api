@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
-from personal_finances.api_server.models import Account, Category
+from personal_finances.api_server.models import Account, Category, Subcategory, Transaction
 
 class TestUser(APITestCase):
     def setUp(self) -> None:
@@ -184,7 +184,6 @@ class TestSubcategory(BaseTestCase):
             {'category': category.id}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        id = response.json()[0]['id']
         # update
         category2 = Category(name='Clothes', of_type=Category.EXPENSE)
         category2.user=self.user
@@ -199,4 +198,60 @@ class TestSubcategory(BaseTestCase):
         # delete
         response = self.client.delete(f'/v1/subcategory/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        
+
+class TestTransaction(BaseTestCase):
+    def test_crud(self):
+        account = Account(
+            user=self.user,
+            name='Mega bank',
+            initial_value=100
+        )
+        account.save()
+        category = Category(
+            user=self.user,
+            name='Home',
+            of_type=Category.EXPENSE
+        )
+        category.save()
+        subcategory = Subcategory(
+            category=category,
+            name='Fixed',
+        )
+        subcategory.save()
+        # create
+        response = self.client.post(
+            '/v1/transaction/',
+            {
+                'account': account.id,
+                'name': 'energy',
+                'date_time': '2022-03-10T20:53:00',
+                'value': 181.25,
+                'type': Transaction.EXPENSE,
+                'status': Transaction.EXECUTED,
+                'repeat': Transaction.MONTHLY,
+                'category': category.id,
+                'subcategory': subcategory.id
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        # retrieve
+        response = self.client.get(f'/v1/transaction/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # list
+        response = self.client.get(
+            '/v1/transaction/',
+            {'type': Transaction.EXPENSE}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # update
+        response = self.client.patch(
+            f'/v1/transaction/{id}/',
+            {'name': 'Energy bill', 'type': Transaction.INCOME}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(response.json()['type'], Transaction.INCOME)
+        self.assertEqual(response.json()['name'], 'Energy bill')
+        # delete
+        response = self.client.delete(f'/v1/transaction/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

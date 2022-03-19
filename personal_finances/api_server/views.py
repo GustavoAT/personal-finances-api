@@ -4,9 +4,9 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth.models import User
-from personal_finances.api_server.models import Account, Category, Subcategory
+from personal_finances.api_server.models import Account, Category, Subcategory, Transaction
 
-from personal_finances.serializers import (AccountSerializer, CategorySerializer, CategoryUpdateSerializer, SubcategorySerializer, SubcategoryUpdateSerializer, UserSerializer,
+from personal_finances.serializers import (AccountSerializer, CategorySerializer, CategoryUpdateSerializer, SubcategorySerializer, SubcategoryUpdateSerializer, TransactionSerializer, TransactionUpdateSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
 
 class Home(APIView):
@@ -190,4 +190,61 @@ class SubcategoryView(APIView):
         except Subcategory.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         subcategory.delete()
+        return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+class TransactionView(APIView):
+    def get(self, request, id=None):
+        if id:
+            try:
+                transaction = Transaction.objects.get(
+                    id=id, account__user=request.user)
+            except Transaction.DoesNotExist:
+                return Response({}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                TransactionSerializer(transaction).data,
+                status=status.HTTP_200_OK
+            )
+        transactions = Transaction.objects.filter(
+            account__user=request.user)
+        transaction_type = request.query_params.get('type')
+        if transaction_type == Transaction.INCOME:
+            transactions = Transaction.incomes.all()
+        if transaction_type == Transaction.EXPENSE:
+            transactions = Transaction.expenses.all()
+        return Response(
+            TransactionSerializer(transactions, many=True).data,
+            status=status.HTTP_200_OK
+        )
+    
+    def post(self, request):
+        transaction_srz = TransactionSerializer(data=request.data)
+        if not transaction_srz.is_valid():
+            return Response(
+                transaction_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        transaction = transaction_srz.save()
+        transaction_srz = TransactionSerializer(transaction)
+        return Response(transaction_srz.data, status=status.HTTP_200_OK)
+    
+    def patch(self, request, id):
+        try:
+            transaction = Transaction.objects.get(
+                id=id, account__user=request.user)
+        except Transaction.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        transaction_srz = TransactionUpdateSerializer(
+            transaction, data=request.data, partial=True)
+        if not transaction_srz.is_valid():
+            return Response(
+                transaction_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        new_transaction = transaction_srz.save()
+        transaction_srz = TransactionSerializer(new_transaction)
+        return Response(transaction_srz.data, status=status.HTTP_200_OK)
+    
+    def delete(self, request, id):
+        try:
+            transaction = Transaction.objects.get(
+                id=id, account__user=request.user)
+        except Transaction.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        transaction.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
