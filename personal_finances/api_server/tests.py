@@ -3,7 +3,8 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
-from personal_finances.api_server.models import Account, Category, Subcategory, Transaction
+from personal_finances.api_server.models import (Account, Category,
+    Subcategory, Transaction)
 
 class TestUser(APITestCase):
     def setUp(self) -> None:
@@ -255,3 +256,44 @@ class TestTransaction(BaseTestCase):
         # delete
         response = self.client.delete(f'/v1/transaction/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+class TestCreditCard(BaseTestCase):
+    def test_crud(self):
+        account = Account(
+            user=self.user,
+            name='Hyper bank',
+            initial_value=100
+        )
+        account.save()
+        # create
+        response = self.client.post(
+            '/v1/credit-card/',
+            {
+                'account': account.id,
+                'name': 'Global express',
+                'label': 'Master',
+                'due_day': 10,
+                'invoice_day': 30,
+                'limit': 5000
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        # retrieve
+        response = self.client.get(f'/v1/credit-card/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # list
+        response = self.client.get('/v1/credit-card/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # update
+        response = self.client.patch(
+            f'/v1/credit-card/{id}/',
+            {'label': 'Visa', 'limit': 4000}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['label'], 'Visa')
+        self.assertEqual(response.json()['limit'], 4000)
+        # delete
+        response = self.client.delete(f'/v1/credit-card/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        

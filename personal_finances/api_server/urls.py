@@ -18,6 +18,8 @@ apiurlpatterns = [
     path('subcategory/<int:id>/', views.SubcategoryView.as_view()),
     path('transaction/', views.TransactionView.as_view()),
     path('transaction/<int:id>/', views.TransactionView.as_view()),
+    path('credit-card/', views.CreditCardView.as_view()),
+    path('credit-card/<int:id>/', views.CreditCardView.as_view()),
 ]
 
 apiurlpatterns.extend(router.urls)

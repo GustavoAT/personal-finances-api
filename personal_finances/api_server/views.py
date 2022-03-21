@@ -4,9 +4,13 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth.models import User
-from personal_finances.api_server.models import Account, Category, Subcategory, Transaction
+from personal_finances.api_server.models import (Account, Category, CreditCard,
+    Subcategory, Transaction)
 
-from personal_finances.serializers import (AccountSerializer, CategorySerializer, CategoryUpdateSerializer, SubcategorySerializer, SubcategoryUpdateSerializer, TransactionSerializer, TransactionUpdateSerializer, UserSerializer,
+from personal_finances.serializers import (AccountSerializer,
+    CategorySerializer, CategoryUpdateSerializer, CreditCardSerializer, SubcategorySerializer,
+    SubcategoryUpdateSerializer, TransactionSerializer,
+    TransactionUpdateSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
 
 class Home(APIView):
@@ -247,4 +251,65 @@ class TransactionView(APIView):
         except Transaction.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         transaction.delete()
+        return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+class CreditCardView(APIView):
+    def get(self, request, id=None):
+        if id:
+            try:
+                card = CreditCard.objects.get(
+                    id=id, account__user=request.user)
+            except CreditCard.DoesNotExist:
+                return Response({}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                CreditCardSerializer(card).data, status=status.HTTP_200_OK)
+        cards = CreditCard.objects.filter(account__user=request.user)
+        return Response(
+            CreditCardSerializer(cards, many=True).data,
+            status=status.HTTP_200_OK
+        )
+    
+    def post(self, request):
+        card_srz = CreditCardSerializer(data=request.data)
+        if not card_srz.is_valid():
+            return Response(
+                card_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            Account.objects.get(
+                id=request.data['account'], user=request.user)
+        except Account.DoesNotExist:
+            return Response(
+                {'message': 'account not found'},
+                status=status.HTTP_404_NOT_FOUND)
+        card = card_srz.save()
+        card_srz = CreditCardSerializer(card)
+        return Response(card_srz.data, status=status.HTTP_200_OK)
+    
+    def patch(self, request, id):
+        try:
+            card = CreditCard.objects.get(id=id, account__user=request.user)
+        except CreditCard.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        card_srz = CreditCardSerializer(card, data=request.data, partial=True)
+        if not card_srz.is_valid():
+            return Response(
+                card_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        if request.data.get('account'):
+            try:
+                Account.objects.get(
+                    id=request.data['account'], user=request.user)
+            except Account.DoesNotExist:
+                return Response(
+                    {'message': 'account not found'},
+                    status=status.HTTP_404_NOT_FOUND)
+        new_card = card_srz.save()
+        card_srz = CreditCardSerializer(new_card)
+        return Response(card_srz.data, status=status.HTTP_200_OK)
+    
+    def delete(self, request, id):
+        try:
+            card = CreditCard.objects.get(id=id, account__user=request.user)
+        except Account.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        card.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)

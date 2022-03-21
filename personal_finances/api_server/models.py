@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import User
@@ -87,3 +88,10 @@ class Transaction(models.Model):
     class Meta:
         ordering = ['-date_time']
 
+class CreditCard(models.Model):
+    account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True)
+    name = models.CharField(max_length=30)
+    label = models.CharField(max_length=30)
+    due_day = models.IntegerField()
+    invoice_day = models.IntegerField()
+    limit = models.IntegerField()
