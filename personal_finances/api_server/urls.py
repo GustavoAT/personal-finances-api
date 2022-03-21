@@ -20,6 +20,14 @@ apiurlpatterns = [
     path('transaction/<int:id>/', views.TransactionView.as_view()),
     path('credit-card/', views.CreditCardView.as_view()),
     path('credit-card/<int:id>/', views.CreditCardView.as_view()),
+    path(
+        'credit-card/<int:credit_card_id>/expense/',
+        views.CreditCardExpenseView.as_view()
+    ),
+    path(
+        'credit-card/<int:credit_card_id>/expense/<int:id>/',
+        views.CreditCardExpenseView.as_view()
+    ),
 ]
 
 apiurlpatterns.extend(router.urls)

@@ -1,7 +1,8 @@
+from dataclasses import fields
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from personal_finances.api_server.models import (Account, Category, CreditCard, Subcategory, Transaction)
+from personal_finances.api_server.models import (Account, Category, CreditCard, CreditCardExpense, Subcategory, Transaction)
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -69,3 +70,8 @@ class CreditCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditCard
         fields = '__all__'
+
+class CreditCardExpenseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CreditCardExpense
+        exclude = ['credit_card']

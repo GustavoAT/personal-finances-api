@@ -4,11 +4,11 @@ from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth.models import User
-from personal_finances.api_server.models import (Account, Category, CreditCard,
+from personal_finances.api_server.models import (Account, Category, CreditCard, CreditCardExpense,
     Subcategory, Transaction)
 
 from personal_finances.serializers import (AccountSerializer,
-    CategorySerializer, CategoryUpdateSerializer, CreditCardSerializer, SubcategorySerializer,
+    CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer, CreditCardSerializer, SubcategorySerializer,
     SubcategoryUpdateSerializer, TransactionSerializer,
     TransactionUpdateSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
@@ -312,4 +312,75 @@ class CreditCardView(APIView):
         except Account.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         card.delete()
+        return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+class CreditCardExpenseView(APIView):
+    def get(self, request, credit_card_id, id=None):
+        if id:
+            try:
+                expense = CreditCardExpense.objects.get(
+                    id=id,
+                    credit_card__id=credit_card_id,
+                    credit_card__account__user=request.user
+                )
+            except CreditCardExpense.DoesNotExist:
+                return Response({}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                CreditCardExpenseSerializer(
+                    expense).data, status=status.HTTP_200_OK)
+        expense = CreditCardExpense.objects.filter(
+            credit_card__id=credit_card_id,
+            credit_card__account__user=request.user
+        )
+        return Response(
+            CreditCardExpenseSerializer(expense, many=True).data,
+            status=status.HTTP_200_OK
+        )
+    
+    def post(self, request, credit_card_id):
+        expense_srz = CreditCardExpenseSerializer(data=request.data)
+        if not expense_srz.is_valid():
+            return Response(
+                expense_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            card = CreditCard.objects.get(
+                id=credit_card_id,
+                account__user=request.user
+            )
+        except CreditCard.DoesNotExist:
+            return Response(
+                {'message': 'credit card not found'},
+                status=status.HTTP_404_NOT_FOUND)
+        expense = expense_srz.save(credit_card=card)
+        expense_srz = CreditCardExpenseSerializer(expense)
+        return Response(expense_srz.data, status=status.HTTP_200_OK)
+    
+    def patch(self, request, credit_card_id, id=None):
+        try:
+            expense = CreditCardExpense.objects.get(
+                id=id,
+                credit_card__id=credit_card_id,
+                credit_card__account__user=request.user
+            )
+        except CreditCardExpense.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        expense_srz = CreditCardExpenseSerializer(
+            expense, data=request.data, partial=True)
+        if not expense_srz.is_valid():
+            return Response(
+                expense_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        new_expense = expense_srz.save()
+        expense_srz = CreditCardExpenseSerializer(new_expense)
+        return Response(expense_srz.data, status=status.HTTP_200_OK)
+    
+    def delete(self, request, credit_card_id, id):
+        try:
+            expense = CreditCardExpense.objects.get(
+                id=id,
+                credit_card__id=credit_card_id,
+                credit_card__account__user=request.user
+            )
+        except CreditCardExpense.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        expense.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)

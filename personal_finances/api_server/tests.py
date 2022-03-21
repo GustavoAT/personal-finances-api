@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
-from personal_finances.api_server.models import (Account, Category,
+from personal_finances.api_server.models import (Account, Category, CreditCard, CreditCardExpense,
     Subcategory, Transaction)
 
 class TestUser(APITestCase):
@@ -295,5 +295,66 @@ class TestCreditCard(BaseTestCase):
         self.assertEqual(response.json()['limit'], 4000)
         # delete
         response = self.client.delete(f'/v1/credit-card/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+class TestCreditCardExpense(BaseTestCase):
+    def test_crud(self):
+        account = Account(
+            user=self.user,
+            name='Hyper bank',
+            initial_value=100
+        )
+        account.save()
+        card = CreditCard(
+            account=account,
+            name='Universal express',
+            label='Ultra',
+            due_day=10,
+            invoice_day=30,
+            limit=3000
+        )
+        card.save()
+        category = Category(
+            user=self.user,
+            name='Kids',
+            of_type=Category.EXPENSE
+        )
+        category.save()
+        subcategory = Subcategory(
+            category=category,
+            name='Toys',
+        )
+        subcategory.save()
+        # create
+        response = self.client.post(
+            f'/v1/credit-card/{card.id}/expense/',
+            {
+                'name': 'Optimus Prime',
+                'date_time': '2022-03-21T14:21:00',
+                'value': 59.99,
+                'status': CreditCardExpense.EXECUTED,
+                'repeat': CreditCardExpense.ONE_TIME,
+                'category': category.id,
+                'subcategory': subcategory.id
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        # retrieve
+        response = self.client.get(f'/v1/credit-card/{card.id}/expense/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # list
+        response = self.client.get(f'/v1/credit-card/{card.id}/expense/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # update
+        response = self.client.patch(
+            f'/v1/credit-card/{card.id}/expense/{id}/',
+            {'value': 69.99}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['value'], '69.99')
+        # delete
+        response = self.client.delete(
+            f'/v1/credit-card/{card.id}/expense/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         

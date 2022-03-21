@@ -9,9 +9,9 @@ class Account(models.Model):
     name = models.CharField(max_length=40)
     description = models.CharField(null=True, max_length=120)
     initial_value = models.DecimalField(
-        max_digits=15, decimal_places=5, default=Decimal(0))
+        max_digits=12, decimal_places=2, default=Decimal(0))
     balance = models.DecimalField(
-        max_digits=15, decimal_places=5, default=Decimal(0))
+        max_digits=12, decimal_places=2, default=Decimal(0))
 
 class Category(models.Model):
     INCOME = 'i'
@@ -66,7 +66,7 @@ class Transaction(models.Model):
     name = models.CharField(max_length=30)
     date_time = models.DateTimeField(default=timezone.now)
     value = models.DecimalField(
-        max_digits=15, decimal_places=5)
+        max_digits=12, decimal_places=2)
     type = models.CharField(max_length=1, choices=TYPE_CHOICES)
     status = models.CharField(
         max_length=1, choices=STATUS_CHOICES, default=EXECUTED)
@@ -89,9 +89,42 @@ class Transaction(models.Model):
         ordering = ['-date_time']
 
 class CreditCard(models.Model):
-    account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True)
+    account = models.ForeignKey(Account, on_delete=models.CASCADE)
     name = models.CharField(max_length=30)
     label = models.CharField(max_length=30)
     due_day = models.IntegerField()
     invoice_day = models.IntegerField()
     limit = models.IntegerField()
+
+class CreditCardExpense(models.Model):
+    PENDING = 'i'
+    EXECUTED = 'e'
+    STATUS_CHOICES =(
+        (PENDING, 'pending'),
+        (EXECUTED, 'executed')
+    )
+    ONE_TIME = 'o'
+    DIVIDED = 'd'
+    MONTHLY = 'm'
+    REPEAT_CHOICES = (
+        (ONE_TIME, 'one time'),
+        (DIVIDED, 'divided'),
+        (MONTHLY, 'monthly')
+    )
+    
+    credit_card = models.ForeignKey(CreditCard, on_delete=models.CASCADE)
+    name = models.CharField(max_length=30)
+    date_time = models.DateTimeField(default=timezone.now)
+    value = models.DecimalField(
+        max_digits=12, decimal_places=2)
+    status = models.CharField(
+        max_length=1, choices=STATUS_CHOICES, default=EXECUTED)
+    repeat = models.CharField(
+        max_length=1, choices=REPEAT_CHOICES, default='o')
+    total_parts = models.IntegerField(null=True)
+    part_number = models.IntegerField(null=True)
+    transference = models.BooleanField(default=False)
+    category = models.ForeignKey(
+        Category, null=True , on_delete=models.SET_NULL)
+    subcategory = models.ForeignKey(
+        Subcategory, null=True, on_delete=models.SET_NULL)
