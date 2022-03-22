@@ -1,17 +1,18 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from django.contrib.auth.models import User
+from django.db import transaction as dbtnsac
+from personal_finances.api_server.models import (Account, Category, CreditCard,
+    CreditCardExpense, Subcategory, Transaction)
+from personal_finances.serializers import (AccountSerializer,
+    CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
+    CreditCardSerializer, SubcategorySerializer, SubcategoryUpdateSerializer,
+    TransactionSerializer, TransactionUpdateSerializer, UserSerializer,
+    UserUpdateAsAdminSerializer, UserUpdateSerializer)
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from django.contrib.auth.models import User
-from personal_finances.api_server.models import (Account, Category, CreditCard, CreditCardExpense,
-    Subcategory, Transaction)
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from personal_finances.serializers import (AccountSerializer,
-    CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer, CreditCardSerializer, SubcategorySerializer,
-    SubcategoryUpdateSerializer, TransactionSerializer,
-    TransactionUpdateSerializer, UserSerializer,
-    UserUpdateAsAdminSerializer, UserUpdateSerializer)
 
 class Home(APIView):
     def get(self, request):
@@ -69,6 +70,9 @@ class AccountView(APIView):
             return Response(
                 account_srz.errors, status=status.HTTP_400_BAD_REQUEST)
         account = account_srz.save(user=request.user)
+        if account.initial_value != account.balance:
+            account.balance = account.initial_value
+            account.save()
         account_srz = AccountSerializer(account)
         return Response(account_srz.data, status=status.HTTP_200_OK)
     
@@ -225,7 +229,14 @@ class TransactionView(APIView):
         if not transaction_srz.is_valid():
             return Response(
                 transaction_srz.errors, status=status.HTTP_400_BAD_REQUEST)
-        transaction = transaction_srz.save()
+        with dbtnsac.atomic():
+            transaction = transaction_srz.save()
+            account = transaction.account
+            if transaction.type == Transaction.INCOME:
+                account.balance += transaction.value
+            elif transaction.type == Transaction.EXPENSE:
+                account.balance -= transaction.value
+            account.save()
         transaction_srz = TransactionSerializer(transaction)
         return Response(transaction_srz.data, status=status.HTTP_200_OK)
     
@@ -240,7 +251,15 @@ class TransactionView(APIView):
         if not transaction_srz.is_valid():
             return Response(
                 transaction_srz.errors, status=status.HTTP_400_BAD_REQUEST)
-        new_transaction = transaction_srz.save()
+        with dbtnsac.atomic():
+            last_value = transaction.value
+            new_transaction = transaction_srz.save()
+            account = new_transaction.account
+            if new_transaction.type == Transaction.INCOME:
+                account.balance += new_transaction.value - last_value
+            elif new_transaction.type == Transaction.EXPENSE:
+                account.balance += last_value - new_transaction.value
+            account.save()
         transaction_srz = TransactionSerializer(new_transaction)
         return Response(transaction_srz.data, status=status.HTTP_200_OK)
     
@@ -250,7 +269,14 @@ class TransactionView(APIView):
                 id=id, account__user=request.user)
         except Transaction.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        transaction.delete()
+        account = transaction.account
+        if transaction.type == Transaction.INCOME:
+            account.balance -= transaction.value
+        elif transaction.type == Transaction.EXPENSE:
+            account.balance += transaction.value
+        with dbtnsac.atomic():
+            transaction.delete()
+            account.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 class CreditCardView(APIView):

@@ -1,10 +1,11 @@
+from decimal import Decimal
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
-from personal_finances.api_server.models import (Account, Category, CreditCard, CreditCardExpense,
-    Subcategory, Transaction)
+from personal_finances.api_server.models import (Account, Category, CreditCard,
+    CreditCardExpense, Subcategory, Transaction)
 
 class TestUser(APITestCase):
     def setUp(self) -> None:
@@ -98,17 +99,17 @@ class TestAccount(BaseTestCase):
             }
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        account_id = response.json()['id']
+        id = response.json()['id']
         # list
         response = self.client.get('/v1/account/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # retrieve
-        response = self.client.get(f'/v1/account/{account_id}/')
+        response = self.client.get(f'/v1/account/{id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['name'], 'bank1')
         # update
         response = self.client.patch(
-            f'/v1/account/{account_id}/',
+            f'/v1/account/{id}/',
             {
                 'name': 'bank 2'
             }
@@ -116,8 +117,23 @@ class TestAccount(BaseTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['name'], 'bank 2')
         # delete
-        response = self.client.delete(f'/v1/account/{account_id}/')
+        response = self.client.delete(f'/v1/account/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+    
+    def test_intitial_value_reflect_balance(self):
+        response = self.client.post(
+            '/v1/account/',
+            {
+                'name': 'bank1',
+                'description': 'first account',
+                'initial_value': 10
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        response = self.client.get(f'/v1/account/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()['balance'], '10.00')
 
 class TestCategory(BaseTestCase):
     def test_crud(self):
@@ -256,6 +272,83 @@ class TestTransaction(BaseTestCase):
         # delete
         response = self.client.delete(f'/v1/transaction/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+    
+    def test_reflect_balance(self):
+        # reflect when creating
+        response = self.client.post(
+            '/v1/account/',
+            {
+                'name': 'bank1',
+                'description': 'first account',
+                'initial_value': 200
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        account_id = response.json()['id']
+        account = Account.objects.get(id=account_id)
+        value = 181.25
+        response = self.client.post(
+            '/v1/transaction/',
+            {
+                'account': account.id,
+                'name': 'energy',
+                'date_time': '2022-03-10T20:53:00',
+                'value': value,
+                'type': Transaction.EXPENSE,
+                'status': Transaction.EXECUTED,
+                'repeat': Transaction.MONTHLY
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        account.refresh_from_db()
+        balance = account.initial_value - Decimal(value)
+        self.assertEqual(account.balance, balance)
+        # reflect when updating
+        value = 100
+        response = self.client.patch(
+            f'/v1/transaction/{id}/',
+            {'value': value}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        account.refresh_from_db()
+        balance = account.initial_value - Decimal(value)
+        self.assertEqual(account.balance, balance)
+        # reflect positive when creating an income
+        value = 181.25
+        response = self.client.post(
+            '/v1/transaction/',
+            {
+                'account': account.id,
+                'name': 'Sell toy',
+                'date_time': '2022-03-21T21:23:00',
+                'value': value,
+                'type': Transaction.INCOME,
+                'status': Transaction.EXECUTED
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        balance += Decimal(value)
+        account.refresh_from_db()
+        self.assertEqual(account.balance, balance)
+        id = response.json()['id']
+        # reflect when updating income
+        subtract = 50
+        value -= subtract
+        response = self.client.patch(
+            f'/v1/transaction/{id}/',
+            {'value': value}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        account.refresh_from_db()
+        balance -= Decimal(subtract)
+        self.assertEqual(account.balance, balance)
+        # reflect when deleting income
+        response = self.client.delete(f'/v1/transaction/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        account.refresh_from_db()
+        balance -= Decimal(value)
+        self.assertEqual(account.balance, balance)
 
 class TestCreditCard(BaseTestCase):
     def test_crud(self):
