@@ -1,6 +1,8 @@
+from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import transaction as dbtnsac
-from personal_finances.api_server.models import (Account, Category, CreditCard,
+from dateutil.relativedelta import relativedelta
+from personal_finances.api_server.models import (Account, CreditCardInvoice, Category, CreditCard,
     CreditCardExpense, Subcategory, Transaction)
 from personal_finances.serializers import (AccountSerializer,
     CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
@@ -232,11 +234,12 @@ class TransactionView(APIView):
         with dbtnsac.atomic():
             transaction = transaction_srz.save()
             account = transaction.account
-            if transaction.type == Transaction.INCOME:
-                account.balance += transaction.value
-            elif transaction.type == Transaction.EXPENSE:
-                account.balance -= transaction.value
-            account.save()
+            if transaction.status == Transaction.EXECUTED:
+                if transaction.type == Transaction.INCOME:
+                    account.balance += transaction.value
+                elif transaction.type == Transaction.EXPENSE:
+                    account.balance -= transaction.value
+                account.save()
         transaction_srz = TransactionSerializer(transaction)
         return Response(transaction_srz.data, status=status.HTTP_200_OK)
     
@@ -255,11 +258,12 @@ class TransactionView(APIView):
             last_value = transaction.value
             new_transaction = transaction_srz.save()
             account = new_transaction.account
-            if new_transaction.type == Transaction.INCOME:
-                account.balance += new_transaction.value - last_value
-            elif new_transaction.type == Transaction.EXPENSE:
-                account.balance += last_value - new_transaction.value
-            account.save()
+            if transaction.status == Transaction.EXECUTED:
+                if new_transaction.type == Transaction.INCOME:
+                    account.balance += new_transaction.value - last_value
+                elif new_transaction.type == Transaction.EXPENSE:
+                    account.balance += last_value - new_transaction.value
+                account.save()
         transaction_srz = TransactionSerializer(new_transaction)
         return Response(transaction_srz.data, status=status.HTTP_200_OK)
     
@@ -270,13 +274,14 @@ class TransactionView(APIView):
         except Transaction.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         account = transaction.account
-        if transaction.type == Transaction.INCOME:
-            account.balance -= transaction.value
-        elif transaction.type == Transaction.EXPENSE:
-            account.balance += transaction.value
         with dbtnsac.atomic():
+            if transaction.status == Transaction.EXECUTED:
+                if transaction.type == Transaction.INCOME:
+                    account.balance -= transaction.value
+                elif transaction.type == Transaction.EXPENSE:
+                    account.balance += transaction.value
+                account.save()
             transaction.delete()
-            account.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 class CreditCardView(APIView):
@@ -346,8 +351,8 @@ class CreditCardExpenseView(APIView):
             try:
                 expense = CreditCardExpense.objects.get(
                     id=id,
-                    credit_card__id=credit_card_id,
-                    credit_card__account__user=request.user
+                    invoice__credit_card__id=credit_card_id,
+                    invoice__expense__account__user=request.user
                 )
             except CreditCardExpense.DoesNotExist:
                 return Response({}, status=status.HTTP_404_NOT_FOUND)
@@ -355,8 +360,8 @@ class CreditCardExpenseView(APIView):
                 CreditCardExpenseSerializer(
                     expense).data, status=status.HTTP_200_OK)
         expense = CreditCardExpense.objects.filter(
-            credit_card__id=credit_card_id,
-            credit_card__account__user=request.user
+            invoice__credit_card__id=credit_card_id,
+            invoice__expense__account__user=request.user
         )
         return Response(
             CreditCardExpenseSerializer(expense, many=True).data,
@@ -377,36 +382,100 @@ class CreditCardExpenseView(APIView):
             return Response(
                 {'message': 'credit card not found'},
                 status=status.HTTP_404_NOT_FOUND)
-        expense = expense_srz.save(credit_card=card)
+        with dbtnsac.atomic():
+            try:
+                card_invoice = CreditCardInvoice.objects.get(
+                    credit_card=card,
+                    period_begin__lte=(
+                        expense_srz.validated_data['date_time'].date()),
+                    period_end__gt=(
+                        expense_srz.validated_data['date_time'].date())
+                )
+                card_invoice_expense = card_invoice.expense
+                card_invoice_expense.value += expense.value
+                card_invoice_expense.save()
+            except CreditCardInvoice.DoesNotExist:
+                invoice_date = (
+                        expense_srz.validated_data['date_time'])
+                invoice_date = invoice_date + relativedelta(
+                    day=card.invoice_day,
+                    hour=0,
+                    minute=0,
+                    second=0
+                )
+                if (
+                        invoice_date
+                        <= expense_srz.validated_data['date_time']):
+                    invoice_date = invoice_date + relativedelta(months=1)
+                due_date = invoice_date + relativedelta(day=card.due_day)
+                if due_date <= invoice_date:
+                    due_date = due_date + relativedelta(months=1)
+                card_invoice_expense = Transaction(
+                    account=card.account,
+                    name=f'{card.name} invoice',
+                    date_time=due_date,
+                    value=Decimal(expense_srz.validated_data['value']),
+                    type=Transaction.EXPENSE,
+                    status=Transaction.PENDING,
+                    repeat=Transaction.ONE_TIME
+                )
+                card_invoice_expense.save()
+                date_begin = (
+                        expense_srz.validated_data['date_time'].date())
+                date_begin = date_begin + relativedelta(
+                    day=card.invoice_day)
+                date_end = date_begin + relativedelta(
+                    months=1, days=-1)
+                card_invoice = CreditCardInvoice(
+                    credit_card=card,
+                    expense=card_invoice_expense,
+                    period_begin=date_begin,
+                    period_end=date_end
+                )
+                card_invoice.save()
+            expense = expense_srz.save(invoice=card_invoice)
         expense_srz = CreditCardExpenseSerializer(expense)
         return Response(expense_srz.data, status=status.HTTP_200_OK)
     
-    def patch(self, request, credit_card_id, id=None):
+    def patch(self, request, credit_card_id, id):
         try:
-            expense = CreditCardExpense.objects.get(
+            card_expense = CreditCardExpense.objects.get(
                 id=id,
-                credit_card__id=credit_card_id,
-                credit_card__account__user=request.user
+                invoice__credit_card__id=credit_card_id,
+                invoice__credit_card__account__user=request.user
             )
         except CreditCardExpense.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        expense_srz = CreditCardExpenseSerializer(
-            expense, data=request.data, partial=True)
-        if not expense_srz.is_valid():
+        card_expense_srz = CreditCardExpenseSerializer(
+            card_expense, data=request.data, partial=True)
+        if not card_expense_srz.is_valid():
             return Response(
-                expense_srz.errors, status=status.HTTP_400_BAD_REQUEST)
-        new_expense = expense_srz.save()
-        expense_srz = CreditCardExpenseSerializer(new_expense)
-        return Response(expense_srz.data, status=status.HTTP_200_OK)
+                card_expense_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        with dbtnsac.atomic():
+            prev_value = card_expense.value
+            new_expense = card_expense_srz.save()
+            diff_value = new_expense.value - prev_value
+            card_invoice_expense = card_expense.invoice.expense
+            card_invoice_expense.value += diff_value 
+            card_invoice_expense.save()
+        card_expense_srz = CreditCardExpenseSerializer(new_expense)
+        return Response(card_expense_srz.data, status=status.HTTP_200_OK)
     
     def delete(self, request, credit_card_id, id):
         try:
-            expense = CreditCardExpense.objects.get(
+            card_expense = CreditCardExpense.objects.get(
                 id=id,
-                credit_card__id=credit_card_id,
-                credit_card__account__user=request.user
+                invoice__credit_card__id=credit_card_id,
+                invoice__credit_card__account__user=request.user
             )
         except CreditCardExpense.DoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        expense.delete()
+        with dbtnsac.atomic():
+            card_invoice_expense = card_expense.invoice.expense
+            card_invoice_expense.value -= card_expense.value
+            if card_invoice_expense.value == Decimal(0):
+                card_invoice_expense.delete()
+            else:
+                card_invoice_expense.save()
+            card_expense.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)

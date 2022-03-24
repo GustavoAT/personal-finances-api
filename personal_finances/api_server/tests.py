@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
@@ -5,7 +6,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
 from personal_finances.api_server.models import (Account, Category, CreditCard,
-    CreditCardExpense, Subcategory, Transaction)
+    CreditCardExpense, CreditCardInvoice, Subcategory, Transaction)
 
 class TestUser(APITestCase):
     def setUp(self) -> None:
@@ -275,17 +276,14 @@ class TestTransaction(BaseTestCase):
     
     def test_reflect_balance(self):
         # reflect when creating
-        response = self.client.post(
-            '/v1/account/',
-            {
-                'name': 'bank1',
-                'description': 'first account',
-                'initial_value': 200
-            }
+        account = Account(
+            user=self.user,
+            name='bank1',
+            description='first account',
+            initial_value=200,
+            balance=200
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        account_id = response.json()['id']
-        account = Account.objects.get(id=account_id)
+        account.save()
         value = 181.25
         response = self.client.post(
             '/v1/transaction/',
@@ -451,3 +449,63 @@ class TestCreditCardExpense(BaseTestCase):
             f'/v1/credit-card/{card.id}/expense/{id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         
+    def test_reflect_invoice(self):
+        # reflect when creating
+        account = Account(
+            user=self.user,
+            name='bank1',
+            description='first account',
+            initial_value=200,
+            balance=200
+        )
+        account.save()
+        card = CreditCard(
+            account=account,
+            label='Top master',
+            due_day=9,
+            invoice_day=2,
+            limit=30000
+        )
+        card.save()
+        value = 60
+        purchase_date = datetime.fromisoformat('2022-03-23T15:57:00')
+        response = self.client.post(
+            f'/v1/credit-card/{card.id}/expense/',
+            {
+                'name': 'Headphones',
+                'date_time': purchase_date,
+                'value': value,
+                'status': Transaction.EXECUTED,
+                'repeat': Transaction.ONE_TIME
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        id = response.json()['id']
+        card_expence = CreditCardExpense.objects.get(id=id)
+        invoice = card_expence.invoice
+        self.assertLessEqual(
+            invoice.period_begin, card_expence.date_time.date())
+        self.assertGreater(
+            invoice.period_end, card_expence.date_time.date())
+        invoice_expense = invoice.expense
+        self.assertEqual(
+            invoice_expense.date_time,
+            datetime.fromisoformat('2022-04-09T03:00:00+00:00')
+        )
+        # reflect when updating
+        value = 100
+        response = self.client.patch(
+            f'/v1/credit-card/{card.id}/expense/{id}/',
+            {'value': value}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        invoice_expense.refresh_from_db()
+        self.assertEqual(invoice_expense.value, value)
+        # reflect when deleting
+        invoice_expense_id = invoice_expense.id
+        response = self.client.delete(
+            f'/v1/credit-card/{card.id}/expense/{id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        invoice_expense = CreditCardInvoice.objects.filter(
+            id=invoice_expense_id).first()
+        self.assertIsNone(invoice_expense)

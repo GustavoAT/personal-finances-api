@@ -70,8 +70,10 @@ class CreditCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditCard
         fields = '__all__'
+        read_only_fields = ['id']
 
 class CreditCardExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditCardExpense
-        exclude = ['credit_card']
+        fields = '__all__'
+        read_only_fields = ['id', 'invoice']

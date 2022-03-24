@@ -96,6 +96,12 @@ class CreditCard(models.Model):
     invoice_day = models.IntegerField()
     limit = models.IntegerField()
 
+class CreditCardInvoice(models.Model):
+    credit_card = models.ForeignKey(CreditCard, on_delete=models.CASCADE)
+    expense = models.OneToOneField(Transaction, on_delete=models.CASCADE)
+    period_begin = models.DateField()
+    period_end = models.DateField()
+
 class CreditCardExpense(models.Model):
     PENDING = 'i'
     EXECUTED = 'e'
@@ -112,7 +118,6 @@ class CreditCardExpense(models.Model):
         (MONTHLY, 'monthly')
     )
     
-    credit_card = models.ForeignKey(CreditCard, on_delete=models.CASCADE)
     name = models.CharField(max_length=30)
     date_time = models.DateTimeField(default=timezone.now)
     value = models.DecimalField(
@@ -128,3 +133,5 @@ class CreditCardExpense(models.Model):
         Category, null=True , on_delete=models.SET_NULL)
     subcategory = models.ForeignKey(
         Subcategory, null=True, on_delete=models.SET_NULL)
+    invoice = models.ForeignKey(
+        CreditCardInvoice, on_delete=models.CASCADE)
