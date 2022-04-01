@@ -509,3 +509,71 @@ class TestCreditCardExpense(BaseTestCase):
         invoice_expense = CreditCardInvoice.objects.filter(
             id=invoice_expense_id).first()
         self.assertIsNone(invoice_expense)
+
+class TestTransference(BaseTestCase):
+    def test_transference_create(self):
+        account = Account(
+            user=self.user,
+            name='Hyper bank',
+            initial_value=100,
+            balance=100
+        )
+        account.save()
+        account2 = Account(
+            user=self.user,
+            name='bank1',
+            description='first account',
+            initial_value=200,
+            balance=200
+        )
+        account2.save()
+        value = 60
+        transfer_date = datetime.fromisoformat('2022-03-28T10:17:00')
+        response = self.client.post(
+            f'/v1/transference/',
+            {
+                'from_account': account2.id,
+                'to_account': account.id,
+                'name': 'Transference',
+                'date_time': transfer_date,
+                'value': value
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        inc_transaction = Transaction.incomes.get(
+            account=account,
+            is_transference=True
+        )
+        self.assertEqual(inc_transaction.value, Decimal(f'{value}.00'))
+        # reflect when updating
+        value = 100
+        response = self.client.patch(
+            f'/v1/transaction/{inc_transaction.id}/',
+            {'value': value}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        exp_transaction = Transaction.expenses.get(
+            account=account2,
+            is_transference=True
+        )
+        self.assertEqual(exp_transaction.value, value)
+        # reflect when deleting
+        response = self.client.delete(
+            f'/v1/transaction/{exp_transaction.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        inc_transaction2 = Transaction.objects.filter(
+            id=inc_transaction.id).first()
+        self.assertIsNone(inc_transaction2)
+        # deny value greater than balance
+        value = 300
+        response = self.client.post(
+            f'/v1/transference/',
+            {
+                'from_account': account2.id,
+                'to_account': account.id,
+                'name': 'Transference',
+                'date_time': transfer_date,
+                'value': value
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

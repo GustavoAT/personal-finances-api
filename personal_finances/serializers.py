@@ -58,13 +58,13 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = '__all__'
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'transference']
 
 class TransactionUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         exclude = ['type']
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'transference']
 
 class CreditCardSerializer(serializers.ModelSerializer):
     class Meta:
@@ -77,3 +77,11 @@ class CreditCardExpenseSerializer(serializers.ModelSerializer):
         model = CreditCardExpense
         fields = '__all__'
         read_only_fields = ['id', 'invoice']
+
+class TransferenceSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=40)
+    from_account = serializers.IntegerField()
+    to_account = serializers.IntegerField()
+    value = serializers.DecimalField(max_digits=12, decimal_places=2)
+    date_time = serializers.DateTimeField()
+    executed = serializers.BooleanField(default=True)

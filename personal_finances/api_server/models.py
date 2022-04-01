@@ -74,7 +74,7 @@ class Transaction(models.Model):
         max_length=1, choices=REPEAT_CHOICES, default='o')
     total_parts = models.IntegerField(null=True)
     part_number = models.IntegerField(null=True)
-    transference = models.BooleanField(default=False)
+    is_transference = models.BooleanField(default=False)
     category = models.ForeignKey(
         Category, null=True ,on_delete=models.SET_NULL)
     subcategory = models.ForeignKey(
@@ -135,3 +135,15 @@ class CreditCardExpense(models.Model):
         Subcategory, null=True, on_delete=models.SET_NULL)
     invoice = models.ForeignKey(
         CreditCardInvoice, on_delete=models.CASCADE)
+
+class Transference(models.Model):
+    from_transaction = models.OneToOneField(
+        Transaction,
+        on_delete=models.RESTRICT,
+        related_name='transference_to'
+    )
+    to_transaction = models.OneToOneField(
+        Transaction,
+        on_delete=models.RESTRICT,
+        related_name='transference_from'
+    )

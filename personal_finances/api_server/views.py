@@ -2,18 +2,19 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import transaction as dbtnsac
 from dateutil.relativedelta import relativedelta
-from personal_finances.api_server.models import (Account, CreditCardInvoice, Category, CreditCard,
-    CreditCardExpense, Subcategory, Transaction)
+from personal_finances.api_server.models import (Account, CreditCardInvoice,
+    Category, CreditCard, CreditCardExpense, Subcategory, Transaction, Transference)
 from personal_finances.serializers import (AccountSerializer,
     CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
     CreditCardSerializer, SubcategorySerializer, SubcategoryUpdateSerializer,
-    TransactionSerializer, TransactionUpdateSerializer, UserSerializer,
+    TransactionSerializer, TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 
 
 class Home(APIView):
@@ -264,6 +265,19 @@ class TransactionView(APIView):
                 elif new_transaction.type == Transaction.EXPENSE:
                     account.balance += last_value - new_transaction.value
                 account.save()
+            if (
+                    new_transaction.value != last_value
+                    and new_transaction.is_transference):
+                if new_transaction.type == Transaction.EXPENSE:
+                    to_transaction = (
+                        new_transaction.transference_to.to_transaction)
+                    to_transaction.value = new_transaction.value
+                    to_transaction.save()
+                elif new_transaction.type == Transaction.INCOME:
+                    from_transaction = (
+                        new_transaction.transference_from.from_transaction)
+                    from_transaction.value = new_transaction.value
+                    from_transaction.save()
         transaction_srz = TransactionSerializer(new_transaction)
         return Response(transaction_srz.data, status=status.HTTP_200_OK)
     
@@ -281,6 +295,17 @@ class TransactionView(APIView):
                 elif transaction.type == Transaction.EXPENSE:
                     account.balance += transaction.value
                 account.save()
+            if  transaction.is_transference:
+                if transaction.type == Transaction.EXPENSE:
+                    transference = transaction.transference_to
+                    to_transaction = transference.to_transaction
+                    transference.delete()
+                    to_transaction.delete()
+                elif transaction.type == Transaction.INCOME:
+                    transference = transaction.transference_from
+                    from_transaction = transference.from_transaction
+                    transference.delete()
+                    from_transaction.delete()
             transaction.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
@@ -479,3 +504,71 @@ class CreditCardExpenseView(APIView):
                 card_invoice_expense.save()
             card_expense.delete()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+def create_transference(request):
+    transf_srz = TransferenceSerializer(data=request.data)
+    if not transf_srz.is_valid():
+            return Response(
+                transf_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        from_account = Account.objects.get(
+            id=transf_srz.validated_data['from_account'],
+            user=request.user
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {'message': 'account from where to transfer not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    try:
+        to_account = Account.objects.get(
+            id=transf_srz.validated_data['to_account'],
+            user=request.user
+        )
+    except Account.DoesNotExist:
+        return Response(
+            {'message': 'account to receive transfer not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    exp_transaction = Transaction(
+        account = from_account,
+        name = transf_srz.validated_data['name'],
+        date_time = transf_srz.validated_data['date_time'],
+        value = transf_srz.validated_data['value'],
+        type = Transaction.EXPENSE,
+        is_transference = True
+    )
+    inc_transaction = Transaction(
+        account = to_account,
+        name = transf_srz.validated_data['name'],
+        date_time = transf_srz.validated_data['date_time'],
+        value = transf_srz.validated_data['value'],
+        type = Transaction.INCOME,
+        is_transference = True
+    )
+    from_account.balance -= exp_transaction.value
+    to_account.balance += inc_transaction.value
+    if (exp_transaction.status == Transaction.EXECUTED
+            and from_account.balance < exp_transaction.value):
+        return Response(
+            {'message': 'account from where to transfer have not'\
+                ' enought money'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    with dbtnsac.atomic():
+        if not transf_srz.validated_data['executed']:
+            exp_transaction.status = Transaction.PENDING
+            inc_transaction.status = Transaction.PENDING
+        else:
+            from_account.save()
+            to_account.save()
+        exp_transaction.save()
+        inc_transaction.save()
+        transference = Transference(
+            from_transaction=exp_transaction,
+            to_transaction=inc_transaction
+        )
+        transference.save()
+    return Response({'message': 'transfered'}, status=status.HTTP_200_OK)
+    

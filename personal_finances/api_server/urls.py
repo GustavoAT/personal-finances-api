@@ -28,6 +28,7 @@ apiurlpatterns = [
         'credit-card/<int:credit_card_id>/expense/<int:id>/',
         views.CreditCardExpenseView.as_view()
     ),
+    path('transference/', views.create_transference),
 ]
 
 apiurlpatterns.extend(router.urls)
