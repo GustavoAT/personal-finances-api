@@ -29,6 +29,7 @@ apiurlpatterns = [
         views.CreditCardExpenseView.as_view()
     ),
     path('transference/', views.create_transference),
+    path('total-balance/', views.get_total_balance),
 ]
 
 apiurlpatterns.extend(router.urls)

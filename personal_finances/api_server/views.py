@@ -1,6 +1,7 @@
 from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import transaction as dbtnsac
+from django.db.models import Sum as dbsum
 from dateutil.relativedelta import relativedelta
 from personal_finances.api_server.models import (Account, CreditCardInvoice,
     Category, CreditCard, CreditCardExpense, Subcategory, Transaction, Transference)
@@ -571,4 +572,13 @@ def create_transference(request):
         )
         transference.save()
     return Response({'message': 'transfered'}, status=status.HTTP_200_OK)
-    
+
+@api_view(['GET'])
+def get_total_balance(request):
+    accounts = Account.objects.filter(
+        user=request.user
+    ).aggregate(dbsum('balance'))
+    return Response(
+        {'total_balance': accounts['balance__sum']},
+        status=status.HTTP_200_OK
+    )

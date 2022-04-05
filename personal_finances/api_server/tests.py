@@ -135,6 +135,23 @@ class TestAccount(BaseTestCase):
         response = self.client.get(f'/v1/account/{id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()['balance'], '10.00')
+    
+    def test_total_balance(self):
+        balance = Decimal(0)
+        for i in range(3):
+            account = Account(
+                user=self.user,
+                name=f'Hyper bank{i}',
+                initial_value=100*i,
+                balance=100*i
+            )
+            account.save()
+            balance += account.balance
+        response = self.client.get('/v1/total-balance/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            Decimal(response.json()['total_balance']), 
+            balance)
 
 class TestCategory(BaseTestCase):
     def test_crud(self):
