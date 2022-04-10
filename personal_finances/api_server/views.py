@@ -1,14 +1,18 @@
 from decimal import Decimal
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.db import transaction as dbtnsac
 from django.db.models import Sum as dbsum
 from dateutil.relativedelta import relativedelta
+from django.forms import ValidationError
 from personal_finances.api_server.models import (Account, CreditCardInvoice,
-    Category, CreditCard, CreditCardExpense, Subcategory, Transaction, Transference)
+    Category, CreditCard, CreditCardExpense, Subcategory, Transaction,
+    Transference)
 from personal_finances.serializers import (AccountSerializer,
     CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
-    CreditCardSerializer, PeriodSerializer, SubcategorySerializer, SubcategoryUpdateSerializer,
-    TransactionSerializer, TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
+    CreditCardSerializer, PasswordChangeSerializer, PeriodSerializer, SubcategorySerializer,
+    SubcategoryUpdateSerializer, TransactionSerializer,
+    TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
@@ -52,6 +56,33 @@ class UserManagement(viewsets.ModelViewSet):
                 return UserUpdateAsAdminSerializer
             return UserSerializer
         return self.serializer_class
+
+@api_view(['POST'])
+def change_password(request):
+    user = request.user
+    pass_srz = PasswordChangeSerializer(data=request.data)
+    if not pass_srz.is_valid():
+        return Response(pass_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+    oldvalid = user.check_password(
+            pass_srz.validated_data['old_password'])
+    if not oldvalid:
+        return Response(
+            {'message': 'invalid old password'},
+            status=status.HTTP_401_UNAUTHORIZED)
+    try:
+        validate_password(pass_srz.validated_data['new_password'], user)
+    except ValidationError as e:
+        return Response(
+            e.messages,
+            status=status.HTTP_400_BAD_REQUEST)
+    user.set_password(pass_srz.validated_data['new_password'])
+    user.save()
+    Token.objects.filter(user=request.user).delete()
+    return Response(
+            {'message': 'change successful'},
+            status=status.HTTP_200_OK)
+    
+    
 
 class AccountView(APIView):
     def get(self, request, id=None):

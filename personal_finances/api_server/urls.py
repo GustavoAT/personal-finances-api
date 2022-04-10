@@ -10,6 +10,7 @@ apiurlpatterns = [
     path('', views.Home.as_view()),
     path('login/', authviews.obtain_auth_token),
     path('delete-token/', views.DeleteToken.as_view()),
+    path('change-password/', views.change_password),
     path('account/', views.AccountView.as_view()),
     path('account/<int:id>/', views.AccountView.as_view()),
     path('category/', views.CategoryView.as_view()),

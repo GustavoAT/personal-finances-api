@@ -1,4 +1,3 @@
-from dataclasses import fields
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
@@ -93,4 +92,13 @@ class PeriodSerializer(serializers.Serializer):
         if data['begin_at'] >= data['end_at']:
             raise serializers.ValidationError(
                 'begin_at cannot be after or equal to end_at')
+        return data
+
+class PasswordChangeSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField()
+    def validate(self, data):
+        if data['old_password'] == data['new_password']:
+            raise serializers.ValidationError(
+                'old password cannot be equal to new password')
         return data
