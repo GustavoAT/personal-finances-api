@@ -7,7 +7,7 @@ from personal_finances.api_server.models import (Account, CreditCardInvoice,
     Category, CreditCard, CreditCardExpense, Subcategory, Transaction, Transference)
 from personal_finances.serializers import (AccountSerializer,
     CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
-    CreditCardSerializer, SubcategorySerializer, SubcategoryUpdateSerializer,
+    CreditCardSerializer, PeriodSerializer, SubcategorySerializer, SubcategoryUpdateSerializer,
     TransactionSerializer, TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
     UserUpdateAsAdminSerializer, UserUpdateSerializer)
 from rest_framework import status, viewsets
@@ -220,9 +220,24 @@ class TransactionView(APIView):
             account__user=request.user)
         transaction_type = request.query_params.get('type')
         if transaction_type == Transaction.INCOME:
-            transactions = Transaction.incomes.all()
+            transactions = Transaction.incomes.filter(
+                account__user=request.user)
         if transaction_type == Transaction.EXPENSE:
-            transactions = Transaction.expenses.all()
+            transactions = Transaction.expenses.filter(
+                account__user=request.user)
+        account_id = request.query_params.get('account_id')
+        if account_id:
+            transactions = transactions.filter(account__id=account_id)
+        if (request.query_params.get('begin_at')
+                or request.query_params.get('end_at')):
+            period_srz = PeriodSerializer(data=request.query_params)
+            if not period_srz.is_valid():
+                return Response(
+                    period_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+            transactions = transactions.filter(
+                date_time__gte=period_srz.validated_data['begin_at'],
+                date_time__lte=period_srz.validated_data['end_at']
+            )
         return Response(
             TransactionSerializer(transactions, many=True).data,
             status=status.HTTP_200_OK

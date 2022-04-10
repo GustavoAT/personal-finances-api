@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
+from random import choice
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -364,6 +365,44 @@ class TestTransaction(BaseTestCase):
         account.refresh_from_db()
         balance -= Decimal(value)
         self.assertEqual(account.balance, balance)
+
+    def test_filters(self):
+        account = Account(
+            user=self.user,
+            name='bank2',
+            description='second account',
+            initial_value=3000,
+            balance=3000
+        )
+        account.save()
+        for i in range(20):
+            transaction = Transaction(
+                account=account,
+                name=f'transaction {i}',
+                date_time=(
+                    datetime.fromisoformat('2022-04-10T16:50:00+03:00')
+                    + timedelta(i*1.5)
+                ).isoformat(),
+                value=100+20*i,
+                type=choice((Transaction.EXPENSE, Transaction.INCOME)),
+                status=Transaction.EXECUTED,
+                repeat=Transaction.ONE_TIME  
+            )
+            transaction.save()
+        response = self.client.get(
+            '/v1/transaction/',
+            {
+                'account_id': account.id,
+                'begin_at': '2022-04-10T16:50:00',
+                'end_at': '2022-05-01T16:50:00'
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result = response.json()
+        self.assertGreater(len(result), 1)
+        self.assertLess(len(result), 19)
+        for res in result:
+            self.assertEqual(res['date_time'].find('2022-05-02'), -1)
 
 class TestCreditCard(BaseTestCase):
     def test_crud(self):

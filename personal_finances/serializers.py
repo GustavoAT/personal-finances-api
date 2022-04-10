@@ -85,3 +85,12 @@ class TransferenceSerializer(serializers.Serializer):
     value = serializers.DecimalField(max_digits=12, decimal_places=2)
     date_time = serializers.DateTimeField()
     executed = serializers.BooleanField(default=True)
+
+class PeriodSerializer(serializers.Serializer):
+    begin_at = serializers.DateTimeField()
+    end_at = serializers.DateTimeField()
+    def validate(self, data):
+        if data['begin_at'] >= data['end_at']:
+            raise serializers.ValidationError(
+                'begin_at cannot be after or equal to end_at')
+        return data
