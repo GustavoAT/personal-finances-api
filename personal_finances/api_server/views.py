@@ -435,6 +435,16 @@ class CreditCardExpenseView(APIView):
             invoice__credit_card__id=credit_card_id,
             invoice__expense__account__user=request.user
         )
+        if (request.query_params.get('begin_at')
+                or request.query_params.get('end_at')):
+            period_srz = PeriodSerializer(data=request.query_params)
+            if not period_srz.is_valid():
+                return Response(
+                    period_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+            expense = expense.filter(
+                date_time__gte=period_srz.validated_data['begin_at'],
+                date_time__lte=period_srz.validated_data['end_at']
+            )
         return Response(
             CreditCardExpenseSerializer(expense, many=True).data,
             status=status.HTTP_200_OK
