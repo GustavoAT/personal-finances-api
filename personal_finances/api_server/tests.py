@@ -401,8 +401,20 @@ class TestTransaction(BaseTestCase):
         result = response.json()
         self.assertGreater(len(result), 1)
         self.assertLess(len(result), 19)
-        for res in result:
+        for res in result['results']:
             self.assertEqual(res['date_time'].find('2022-05-02'), -1)
+        response = self.client.get(
+            '/v1/transaction/',
+            {
+                'account_id': account.id,
+                'page': 2,
+                'page_size': 5
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result = response.json()
+        self.assertEqual(result['count'], 20)
+        self.assertEqual(len(result['results']), 5)
 
 class TestCreditCard(BaseTestCase):
     def test_crud(self):

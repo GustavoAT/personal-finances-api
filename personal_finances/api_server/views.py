@@ -1,25 +1,28 @@
 from decimal import Decimal
+
+from dateutil.relativedelta import relativedelta
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction as dbtnsac
 from django.db.models import Sum as dbsum
-from dateutil.relativedelta import relativedelta
 from django.forms import ValidationError
-from personal_finances.api_server.models import (Account, CreditCardInvoice,
-    Category, CreditCard, CreditCardExpense, Subcategory, Transaction,
-    Transference)
-from personal_finances.serializers import (AccountSerializer,
-    CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
-    CreditCardSerializer, PasswordChangeSerializer, PeriodSerializer, SubcategorySerializer,
-    SubcategoryUpdateSerializer, TransactionSerializer,
-    TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
-    UserUpdateAsAdminSerializer, UserUpdateSerializer)
 from rest_framework import status, viewsets
 from rest_framework.authtoken.models import Token
+from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view
+
+from personal_finances.api_server.models import (Account, Category, CreditCard,
+    CreditCardExpense, CreditCardInvoice, Subcategory, Transaction,
+    Transference)
+from personal_finances.api_server.pagination import PageNumberCustomPagination
+from personal_finances.serializers import (AccountSerializer,
+    CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
+    CreditCardSerializer, PasswordChangeSerializer, PeriodSerializer,
+    SubcategorySerializer, SubcategoryUpdateSerializer, TransactionSerializer,
+    TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
+    UserUpdateAsAdminSerializer, UserUpdateSerializer)
 
 
 class Home(APIView):
@@ -269,10 +272,14 @@ class TransactionView(APIView):
                 date_time__gte=period_srz.validated_data['begin_at'],
                 date_time__lte=period_srz.validated_data['end_at']
             )
-        return Response(
-            TransactionSerializer(transactions, many=True).data,
-            status=status.HTTP_200_OK
-        )
+        pagination = PageNumberCustomPagination()
+        return pagination.get_paginated_response(
+                TransactionSerializer(
+                    pagination.paginate_queryset(
+                        transactions, request, self)
+                    , many=True
+                ).data
+            )
     
     def post(self, request):
         transaction_srz = TransactionSerializer(data=request.data)
