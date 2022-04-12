@@ -578,6 +578,50 @@ class TestCreditCardExpense(BaseTestCase):
             id=invoice_expense_id).first()
         self.assertIsNone(invoice_expense)
 
+    def test_pagination(self):
+        account = Account(
+            user=self.user,
+            name='bank3',
+            description='third account',
+            initial_value=400,
+            balance=400
+        )
+        account.save()
+        card = CreditCard(
+            account=account,
+            label='Top master plus',
+            due_day=9,
+            invoice_day=2,
+            limit=40000
+        )
+        card.save()
+        for i in range(20):
+            response = self.client.post(
+                f'/v1/credit-card/{card.id}/expense/',
+                {
+                    'name': f'Item {i}',
+                    'date_time': (
+                        datetime.fromisoformat('2022-04-11T20:24:00+03:00')
+                        + timedelta(i)
+                    ).isoformat(),
+                    'value': (-0.2 * (i - 10)**2 + 23) * 10,
+                    'status': Transaction.EXECUTED,
+                    'repeat': Transaction.ONE_TIME
+                }
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.get(
+            f'/v1/credit-card/{card.id}/expense/',
+            {
+                'page': 2,
+                'page_size': 5
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result = response.json()
+        self.assertEqual(result['count'], 20)
+        self.assertEqual(len(result['results']), 5)
+
 class TestTransference(BaseTestCase):
     def test_transference_create(self):
         account = Account(

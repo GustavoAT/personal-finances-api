@@ -100,6 +100,9 @@ class CreditCardInvoice(models.Model):
     expense = models.OneToOneField(Transaction, on_delete=models.CASCADE)
     period_begin = models.DateField()
     period_end = models.DateField()
+    
+    class Meta:
+        ordering = ['-period_begin']
 
 class CreditCardExpense(models.Model):
     PENDING = 'i'
@@ -134,6 +137,9 @@ class CreditCardExpense(models.Model):
         Subcategory, null=True, on_delete=models.SET_NULL)
     invoice = models.ForeignKey(
         CreditCardInvoice, on_delete=models.CASCADE)
+    
+    class Meta:
+        ordering = ['-date_time']
 
 class Transference(models.Model):
     from_transaction = models.OneToOneField(

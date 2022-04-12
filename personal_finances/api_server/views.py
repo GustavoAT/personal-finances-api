@@ -452,10 +452,14 @@ class CreditCardExpenseView(APIView):
                 date_time__gte=period_srz.validated_data['begin_at'],
                 date_time__lte=period_srz.validated_data['end_at']
             )
-        return Response(
-            CreditCardExpenseSerializer(expense, many=True).data,
-            status=status.HTTP_200_OK
-        )
+        pagination = PageNumberCustomPagination()
+        return pagination.get_paginated_response(
+                CreditCardExpenseSerializer(
+                    pagination.paginate_queryset(
+                        expense, request, self)
+                    , many=True
+                ).data
+            )
     
     def post(self, request, credit_card_id):
         expense_srz = CreditCardExpenseSerializer(data=request.data)
@@ -481,7 +485,8 @@ class CreditCardExpenseView(APIView):
                         expense_srz.validated_data['date_time'].date())
                 )
                 card_invoice_expense = card_invoice.expense
-                card_invoice_expense.value += expense.value
+                card_invoice_expense.value += Decimal(
+                    expense_srz.validated_data['value'])
                 card_invoice_expense.save()
             except CreditCardInvoice.DoesNotExist:
                 invoice_date = (
