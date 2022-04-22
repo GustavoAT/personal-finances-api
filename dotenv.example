@@ -2,3 +2,6 @@ DEBUG=True
 SECRET_KEY='secret-key'
 LANGUAGE_CODE=en-us
 TIME_ZONE=UTC
+ANON_RATE='24/day'
+USER_RATE='5/minute'
+PREMIUM_RATE='1/second'

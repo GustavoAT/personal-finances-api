@@ -152,3 +152,16 @@ class Transference(models.Model):
         on_delete=models.RESTRICT,
         related_name='transference_from'
     )
+
+class UserExtras(models.Model):
+    STARNDARD = 's'
+    PREMIUM = 'p'
+    ADMIN = 'a'
+    TYPE_CHOICES = (
+        (STARNDARD, 'standard'),
+        (PREMIUM, 'premium'),
+        (ADMIN, 'admin')
+    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    type = models.CharField(
+        max_length=1, choices=TYPE_CHOICES, default=STARNDARD)

@@ -21,25 +21,25 @@ from personal_finances.serializers import (AccountSerializer,
     CategorySerializer, CategoryUpdateSerializer, CreditCardExpenseSerializer,
     CreditCardSerializer, PasswordChangeSerializer, PeriodSerializer,
     SubcategorySerializer, SubcategoryUpdateSerializer, TransactionSerializer,
-    TransactionUpdateSerializer, TransferenceSerializer, UserSerializer,
-    UserUpdateAsAdminSerializer, UserUpdateSerializer)
+    TransactionUpdateSerializer, TransferenceSerializer, UserExtrasSerializer,
+    UserSerializer, UserUpdateAsAdminSerializer, UserUpdateSerializer)
 
 
-class Home(APIView):
-    def get(self, request):
-        return Response(
-            {'message': 'Personal finances API.'\
-                f' Welcome {request.user.get_full_name()}'},
-            status=status.HTTP_200_OK
-        )
+@api_view(['GET'])
+def home(request):
+    return Response(
+        {'message': 'Personal finances API.'\
+            f' Welcome {request.user.get_full_name()}'},
+        status=status.HTTP_200_OK
+    )
 
-class DeleteToken(APIView):
-    def delete(self, request):
-        delete_result = Token.objects.filter(user=request.user).delete()
-        return Response(
-            {'deleted': delete_result[0]},
-            status=status.HTTP_204_NO_CONTENT
-        )
+@api_view(['DELETE'])
+def delete_token(request):
+    delete_result = Token.objects.filter(user=request.user).delete()
+    return Response(
+        {'deleted': delete_result[0]},
+        status=status.HTTP_204_NO_CONTENT
+    )
 
 class UserManagement(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -85,8 +85,6 @@ def change_password(request):
             {'message': 'change successful'},
             status=status.HTTP_200_OK)
     
-    
-
 class AccountView(APIView):
     def get(self, request, id=None):
         if id:
@@ -650,3 +648,30 @@ def get_total_balance(request):
         {'total_balance': accounts['balance__sum']},
         status=status.HTTP_200_OK
     )
+
+class UserExtrasView(APIView):
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request):
+        userextras_srz = UserExtrasSerializer(data=request.data)
+        if not userextras_srz.is_valid():
+            return Response(
+                userextras_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        uextras = userextras_srz.save()
+        userextras_srz = UserExtrasSerializer(uextras)
+        return Response(userextras_srz.data, status=status.HTTP_200_OK)
+    
+    def patch(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        userextras_srz = UserExtrasSerializer(
+            user.userextras, data=request.data, partial=True)
+        if not userextras_srz.is_valid():
+            return Response(
+                userextras_srz.errors, status=status.HTTP_400_BAD_REQUEST)
+        new_uextras = userextras_srz.save()
+        userextras_srz = CreditCardExpenseSerializer(new_uextras)
+        return Response(userextras_srz.data, status=status.HTTP_200_OK)
+    

@@ -7,9 +7,9 @@ router = SimpleRouter()
 router.register('user', views.UserManagement)
 
 apiurlpatterns = [
-    path('', views.Home.as_view()),
+    path('', views.home),
     path('login/', authviews.obtain_auth_token),
-    path('delete-token/', views.DeleteToken.as_view()),
+    path('delete-token/', views.delete_token),
     path('change-password/', views.change_password),
     path('account/', views.AccountView.as_view()),
     path('account/<int:id>/', views.AccountView.as_view()),
@@ -31,6 +31,8 @@ apiurlpatterns = [
     ),
     path('transference/', views.create_transference),
     path('total-balance/', views.get_total_balance),
+    path('user-extras/', views.UserExtrasView.as_view()),
+    path('user-extras/user/<int:user_id>/', views.UserExtrasView.as_view()),
 ]
 
 apiurlpatterns.extend(router.urls)
