@@ -672,6 +672,6 @@ class UserExtrasView(APIView):
             return Response(
                 userextras_srz.errors, status=status.HTTP_400_BAD_REQUEST)
         new_uextras = userextras_srz.save()
-        userextras_srz = CreditCardExpenseSerializer(new_uextras)
+        userextras_srz = UserExtrasSerializer(new_uextras)
         return Response(userextras_srz.data, status=status.HTTP_200_OK)
     

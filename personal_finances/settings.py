@@ -134,12 +134,12 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
+        'personal_finances.api_server.throttling.PremiumUserRateThrottle'
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': ENV['ANON_RATE'],
         'user': ENV['USER_RATE'],
+        'admin': ENV['ADMIN_RATE'],
         'premium': ENV['PREMIUM_RATE']
     }
 }

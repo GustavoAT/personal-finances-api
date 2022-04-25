@@ -4,4 +4,5 @@ LANGUAGE_CODE=en-us
 TIME_ZONE=UTC
 ANON_RATE='24/day'
 USER_RATE='5/minute'
+ADMIN_RATE='100/min'
 PREMIUM_RATE='1/second'

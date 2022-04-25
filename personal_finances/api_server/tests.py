@@ -1,13 +1,15 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from random import choice
+from time import sleep
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 
 from personal_finances.api_server.models import (Account, Category, CreditCard,
-    CreditCardExpense, CreditCardInvoice, Subcategory, Transaction)
+    CreditCardExpense, CreditCardInvoice, Subcategory, Transaction, UserExtras)
+from personal_finances.api_server.throttling import PremiumUserRateThrottle
 
 class TestUser(APITestCase):
     def setUp(self) -> None:
@@ -689,3 +691,69 @@ class TestTransference(BaseTestCase):
             }
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+class TestUserExtras(BaseTestCase):
+    def test_create_update(self):
+        self.admin = User.objects.create_user(
+            username='AdminUser',
+            password='admintestpassword',
+            is_superuser=True,
+            is_staff=True
+        )
+        token = Token.objects.get_or_create(user=self.admin)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
+        response = self.client.post(
+            '/v1/user-extras/',
+            {
+                'user': self.user.id,
+                'type': UserExtras.PREMIUM
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.patch(
+            f'/v1/user-extras/user/{self.user.id}/',
+            {
+                'user': self.user.id,
+                'type': UserExtras.STARNDARD
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+    
+    def test_throttling(self):
+        uext = UserExtras(user=self.user, type=UserExtras.STARNDARD)
+        uext.save()
+        throttle = PremiumUserRateThrottle()
+        throttle_rate, duration = throttle.parse_rate(throttle.get_rate())
+        token = Token.objects.get_or_create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
+        for i in range(1, throttle_rate):
+            response = self.client.get(
+                '/v1/transaction/',
+                {'type': Transaction.EXPENSE}
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.get(
+                '/v1/transaction/',
+                {'type': Transaction.EXPENSE}
+            )
+        self.assertEqual(
+            response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        uext.type = UserExtras.PREMIUM
+        uext.save()
+        throttle = PremiumUserRateThrottle()
+        throttle.scope = 'premium'
+        throttle_rate, duration = throttle.parse_rate(throttle.get_rate())
+        token = Token.objects.get_or_create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
+        for i in range(1, throttle_rate):
+            response = self.client.get(
+                '/v1/transaction/',
+                {'type': Transaction.EXPENSE}
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.client.get(
+                '/v1/transaction/',
+                {'type': Transaction.EXPENSE}
+            )
+        self.assertEqual(
+            response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

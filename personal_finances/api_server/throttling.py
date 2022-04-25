@@ -7,11 +7,20 @@ class PremiumUserRateThrottle(UserRateThrottle):
         pass
     
     def allow_request(self, request, view):
-        try:
-            usertype = request.user.userextras.type
-        except UserExtras.DoesNotExist:
+        self.rate = self.get_rate()
+        user = request.user
+        if user.is_staff:
+            self.scope = 'admin'
+            self.rate = self.get_rate()
+            self.num_requests, self.duration = self.parse_rate(self.rate)
             return super().allow_request(request, view)
+        try:
+            usertype = user.userextras.type
+        except UserExtras.DoesNotExist:
+            return self.throttle_failure()
         if usertype == UserExtras.PREMIUM:
             self.scope = 'premium'
-        self.num_requests, self.duration = self.parse_rate(self.get_rate())
+            self.rate = self.get_rate()
+            
+        self.num_requests, self.duration = self.parse_rate(self.rate)
         return super().allow_request(request, view)
