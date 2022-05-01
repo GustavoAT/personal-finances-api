@@ -1,0 +1,19 @@
+version: '3.9'
+services:
+    django:
+        build:
+            context: .
+            dockerfile: ./docker/restapi/Dockerfile
+        command: gunicorn -b :8000 personal_finances.wsgi --timeout 601
+        volumes:
+            - sqlitefile:/app/sqlitedb
+    
+    nginx:
+        build:
+            context: .
+            dockerfile: ./docker/nginx/Dockerfile
+        ports:
+            - "80:80"
+
+volumes:
+    sqlitefile:
