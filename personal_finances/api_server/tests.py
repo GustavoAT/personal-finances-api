@@ -726,7 +726,7 @@ class TestUserExtras(BaseTestCase):
         throttle_rate, duration = throttle.parse_rate(throttle.get_rate())
         token = Token.objects.get_or_create(user=self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
-        for i in range(1, throttle_rate):
+        for i in range(throttle_rate):
             response = self.client.get(
                 '/v1/transaction/',
                 {'type': Transaction.EXPENSE}
@@ -745,7 +745,7 @@ class TestUserExtras(BaseTestCase):
         throttle_rate, duration = throttle.parse_rate(throttle.get_rate())
         token = Token.objects.get_or_create(user=self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token[0]}')
-        for i in range(1, throttle_rate):
+        for i in range(throttle_rate):
             response = self.client.get(
                 '/v1/transaction/',
                 {'type': Transaction.EXPENSE}
