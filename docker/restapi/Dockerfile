@@ -6,4 +6,4 @@ COPY . .
 
 RUN pip install -r requirements.txt
 
-copy ./.env ./.env
+COPY ./.env ./.env
