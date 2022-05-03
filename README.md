@@ -37,6 +37,11 @@ or Doker compose:
 
 `sudo docker-compose up -d --build`
 
-This example project use sqlite. Make the configurations of django and compose file to use other database engine. For help, the documentations:
+This example project use sqlite. Make the changes in django settings and/or 
+compose file, maybe adding a db service, if you want to use other database engine. For help, check the docs:
+
 https://docs.djangoproject.com/en/4.0/topics/install/#database-installation
+
 https://docs.djangoproject.com/en/4.0/intro/tutorial02/#database-setup
+
+https://docs.docker.com/compose/compose-file/
